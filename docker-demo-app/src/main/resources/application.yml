@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: dockerDemo
+  datasource:
+    url: jdbc:mysql://localhost:3306/springboot_test?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+mybatis:
+  type-aliases-package: org.example.dockerdemo.entity
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    org.example.dockerdemo.mapper: DEBUG
+
+deepseek:
+  api:
+    key: ${DEEPSEEK_API_KEY:sk-a872a72ccdc34c57af66f43bf2404fed}
+  prompt:
+    system: ${DEEPSEEK_PROMPT_SYSTEM:你是电商客服助手，回答简短、礼貌。}
+    background: ${DEEPSEEK_PROMPT_BACKGROUND:- 商品A：蓝牙耳机，续航20小时，IPX4\n- 支持7天无理由退货}

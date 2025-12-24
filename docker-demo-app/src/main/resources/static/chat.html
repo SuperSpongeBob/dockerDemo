@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek Chat Demo</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f6fb; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 32px; }
+    h1 { margin: 0 0 12px; font-size: 22px; }
+    .chat-box { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); min-height: 320px; }
+    .msg { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; max-width: 88%; line-height: 1.6; white-space: pre-wrap; }
+    .user { background: #e8f2ff; margin-left: auto; border: 1px solid #d5e6ff; }
+    .bot { background: #f7f7f9; border: 1px solid #e6e6ef; }
+    .input-row { display: flex; gap: 10px; margin-top: 14px; }
+    textarea { flex: 1; resize: vertical; min-height: 56px; max-height: 180px; padding: 10px; border-radius: 10px; border: 1px solid #d0d7e2; font-size: 14px; }
+    button { padding: 12px 18px; background: #4b7bec; color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 14px; }
+    button:disabled { background: #9fb7ff; cursor: not-allowed; }
+    .tip { color: #666; font-size: 12px; margin-top: 8px; }
+    @media (max-width: 640px) { .wrap { padding: 16px 12px 24px; } .chat-box { min-height: 260px; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>DeepSeek 聊天示例</h1>
+    <div class="tip" style="margin-bottom:8px;">提示词与背景在后端配置，如需修改请更新服务端配置。</div>
+    <label class="tip"><input type="checkbox" id="keepContext" checked> 保留上下文对话历史</label>
+    <div class="chat-box" id="chatBox"></div>
+    <div class="input-row">
+      <textarea id="message" placeholder="输入问题后点击发送..."></textarea>
+      <button id="sendBtn">发送</button>
+    </div>
+    <div class="tip">提示：API Key 从服务端读取，请在服务端配置环境变量 DEEPSEEK_API_KEY。</div>
+  </div>
+  <script>
+    const chatBox = document.getElementById('chatBox');
+    const sendBtn = document.getElementById('sendBtn');
+    const messageInput = document.getElementById('message');
+    const keepContextInput = document.getElementById('keepContext');
+    let history = [];
+
+    function appendMessage(text, role) {
+      const div = document.createElement('div');
+      div.className = `msg ${role === 'user' ? 'user' : 'bot'}`;
+      div.textContent = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function send() {
+      const text = messageInput.value.trim();
+      if (!text) return;
+      messageInput.value = '';
+      appendMessage(text, 'user');
+      setLoading(true);
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, history: keepContextInput.checked ? history : [] })
+        });
+        if (!res.ok) { const msg = await res.text(); throw new Error(msg || res.statusText); }
+        const data = await res.json();
+        const botMsg = data.reply || '（未获取到回复）';
+        appendMessage(botMsg, 'bot');
+        if (keepContextInput.checked) {
+          history.push({ role: 'user', content: text });
+          history.push({ role: 'assistant', content: botMsg });
+        } else { history = []; }
+      } catch (err) { appendMessage('出错了：' + err.message, 'bot'); }
+      finally { setLoading(false); }
+    }
+
+    function setLoading(loading) {
+      sendBtn.disabled = loading;
+      sendBtn.textContent = loading ? '发送中...' : '发送';
+    }
+
+    sendBtn.addEventListener('click', send);
+    messageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+  </script>
+</body>
+</html>

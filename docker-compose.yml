@@ -1,0 +1,45 @@
+#version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: docker-demo-app
+    ports:
+      - "8080:8080"
+    environment:
+      # 覆盖 Spring Boot 数据源配置，指向 Compose 内的 MySQL 服务
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/springboot_test?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: 123456
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  mysql:
+    image: mysql:8.0.36
+    container_name: docker-demo-mysql
+#    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: springboot_test
+    ports:
+      - "3307:3306"
+    volumes:
+      - D:/test/docker/volumes/mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
+
+#volumes:
+#  mysql_data:
+
