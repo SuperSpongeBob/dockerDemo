@@ -6,10 +6,22 @@ import java.util.List;
  * 聊天请求 DTO
  */
 public class ChatRequest {
+    /**
+     * 会话ID，可选。如果提供则关联到已有会话，否则创建新会话
+     */
+    private String sessionId;
     private String message;
     private String systemPrompt;
     private String background;
     private List<ChatMessage> history;
+
+    public String getSessionId() {
+        return sessionId;
+    }
+
+    public void setSessionId(String sessionId) {
+        this.sessionId = sessionId;
+    }
 
     public String getMessage() {
         return message;

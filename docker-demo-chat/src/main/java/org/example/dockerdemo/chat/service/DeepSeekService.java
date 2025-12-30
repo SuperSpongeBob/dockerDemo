@@ -3,6 +3,7 @@ package org.example.dockerdemo.chat.service;
 import org.example.dockerdemo.chat.config.DeepSeekProperties;
 import org.example.dockerdemo.chat.dto.ChatMessage;
 import org.example.dockerdemo.chat.dto.ChatRequest;
+import org.example.dockerdemo.chat.entity.ChatMessageEntity;
 import org.example.dockerdemo.chat.exception.DeepSeekException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +28,21 @@ public class DeepSeekService {
 
     private static final Logger log = LoggerFactory.getLogger(DeepSeekService.class);
     private static final String DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
+    
+    /**
+     * 默认加载的历史消息数量限制，用于控制token消耗
+     */
+    private static final int DEFAULT_HISTORY_LIMIT = 20;
 
     private final RestTemplate restTemplate;
     private final DeepSeekProperties properties;
+    private final ChatMessageService messageService;
 
-    public DeepSeekService(RestTemplate restTemplate, DeepSeekProperties properties) {
+    public DeepSeekService(RestTemplate restTemplate, DeepSeekProperties properties,
+                           ChatMessageService messageService) {
         this.restTemplate = restTemplate;
         this.properties = properties;
+        this.messageService = messageService;
     }
 
     public String chat(ChatRequest request) {
@@ -84,7 +93,14 @@ public class DeepSeekService {
             messages.add(createMessage("system", "背景信息：" + background));
         }
 
-        if (request.getHistory() != null) {
+        // 优先从数据库加载历史消息（如果提供了sessionId）
+        if (StringUtils.hasText(request.getSessionId())) {
+            List<ChatMessageEntity> historyFromDb = loadHistoryFromDatabase(request.getSessionId());
+            for (ChatMessageEntity msg : historyFromDb) {
+                messages.add(createMessage(normalizeRole(msg.getRole()), msg.getContent()));
+            }
+        } else if (request.getHistory() != null) {
+            // 如果没有sessionId，则使用请求中传入的history
             for (ChatMessage msg : request.getHistory()) {
                 if (msg != null && StringUtils.hasText(msg.getContent())) {
                     messages.add(createMessage(normalizeRole(msg.getRole()), msg.getContent()));
@@ -94,6 +110,36 @@ public class DeepSeekService {
 
         messages.add(createMessage("user", request.getMessage()));
         return messages;
+    }
+
+    /**
+     * 从数据库加载会话的历史消息
+     * 限制加载最近N条消息以控制token消耗
+     * 
+     * @param sessionId 会话ID
+     * @return 历史消息列表，按时间正序排列
+     */
+    public List<ChatMessageEntity> loadHistoryFromDatabase(String sessionId) {
+        return loadHistoryFromDatabase(sessionId, DEFAULT_HISTORY_LIMIT);
+    }
+
+    /**
+     * 从数据库加载会话的历史消息
+     * 
+     * @param sessionId 会话ID
+     * @param limit 最大消息数量
+     * @return 历史消息列表，按时间正序排列
+     */
+    public List<ChatMessageEntity> loadHistoryFromDatabase(String sessionId, int limit) {
+        if (!StringUtils.hasText(sessionId)) {
+            return new ArrayList<>();
+        }
+        try {
+            return messageService.getRecentMessages(sessionId, limit);
+        } catch (Exception e) {
+            log.warn("加载历史消息失败，sessionId={}, error={}", sessionId, e.getMessage());
+            return new ArrayList<>();
+        }
     }
 
     private Map<String, String> createMessage(String role, String content) {
